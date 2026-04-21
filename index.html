@@ -388,6 +388,8 @@ function initMap(){
   baseLayers.dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:22});
   baseLayers.topo.addTo(map);
   currentBase='topo';
+  // Açılışta uydu — KMZ yüklendikten sonra uydu'ya geç
+  
 
   map.on('click',onMapClick);
   map.on('mousemove',onMouseMove);
@@ -501,6 +503,13 @@ function parseKML(text){
   }
 
   setLoadingStatus(`${count} obje yüklendi`, 100);
+  // Uydu haritaya geç
+  map.removeLayer(baseLayers[currentBase]);
+  baseLayers.sat.addTo(map);
+  baseLayers.sat.bringToBack();
+  currentBase='sat';
+  document.querySelectorAll('.mt-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('mt-sat').classList.add('active');
   setTimeout(hideLoding,600);
   startGPS();
 }
