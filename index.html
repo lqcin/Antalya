@@ -396,19 +396,36 @@ function parseKML(text){
 function getKMLColor(pm,doc){
   try{
     const su=pm.querySelector('styleUrl')?.textContent?.replace('#','');
+
     if(su){
-      const style=doc.querySelector(`Style[id="${su}"] LineStyle color`)||
-                  doc.querySelector(`Style[id="${su}"] PolyStyle color`)||
-                  doc.querySelector(`Style[id="${su}"] IconStyle color`);
+      const style=doc.querySelector(`Style[id="${su}"]`);
+
       if(style){
-        const hex=style.textContent.trim();
-        if(hex.length===8){
-          const r=hex.substr(6,2),g=hex.substr(4,2),b=hex.substr(2,2);
-          return '#'+r+g+b;
+        const colorNode=
+          style.querySelector('LineStyle > color') ||
+          style.querySelector('PolyStyle > color') ||
+          style.querySelector('IconStyle > color');
+
+        if(colorNode){
+          const hex=colorNode.textContent.trim();
+
+          // KML: aabbggrr → RGB'ye çevir
+          if(hex.length===8){
+            const a=parseInt(hex.substr(0,2),16)/255;
+            const b=hex.substr(2,2);
+            const g=hex.substr(4,2);
+            const r=hex.substr(6,2);
+
+            return {
+              color:'#'+r+g+b,
+              opacity:a
+            };
+          }
         }
       }
     }
-  }catch{}
+  }catch(e){}
+
   return null;
 }
 
