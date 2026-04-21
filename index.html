@@ -28,15 +28,64 @@
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif;}
 #map{position:absolute;inset:0;z-index:0;}
 
-/* Loading */
+/* Splash Screen */
 #loading{
   position:absolute;inset:0;z-index:999;
   background:var(--bg);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  overflow:hidden;
 }
-#loading .logo{font-size:48px;}
-#loading h1{font-size:22px;font-weight:700;color:var(--text);letter-spacing:1px;}
-#loading p{font-size:13px;color:var(--text2);}
+.splash-map-bg{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 30%, rgba(74,158,255,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 20% 80%, rgba(0,229,180,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 50% at 80% 60%, rgba(74,158,255,0.05) 0%, transparent 50%);
+  /* Grid çizgiler — harita hissi */
+  background-image:
+    linear-gradient(rgba(74,158,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(74,158,255,0.04) 1px, transparent 1px),
+    radial-gradient(ellipse 80% 60% at 50% 30%, rgba(74,158,255,0.08) 0%, transparent 70%);
+  background-size: 40px 40px, 40px 40px, 100% 100%;
+}
+.splash-content{
+  position:relative;z-index:1;
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  padding:40px;
+}
+.splash-icon{
+  width:80px;height:80px;
+  background:rgba(74,158,255,0.1);border:1px solid rgba(74,158,255,0.3);
+  border-radius:24px;display:flex;align-items:center;justify-content:center;
+  margin-bottom:8px;
+  box-shadow:0 0 40px rgba(74,158,255,0.15);
+  animation:iconPulse 2s ease-in-out infinite;
+}
+@keyframes iconPulse{0%,100%{box-shadow:0 0 40px rgba(74,158,255,0.15);}50%{box-shadow:0 0 60px rgba(74,158,255,0.3);}}
+.splash-title{
+  font-size:28px;font-weight:800;color:var(--text);
+  letter-spacing:-0.5px;
+}
+.splash-subtitle{
+  font-size:13px;color:var(--text2);letter-spacing:2px;
+  text-transform:uppercase;font-weight:500;
+}
+.splash-loading{
+  margin-top:24px;display:flex;flex-direction:column;align-items:center;gap:10px;
+  width:220px;
+}
+.splash-bar{
+  width:100%;height:3px;background:rgba(74,158,255,0.15);border-radius:2px;overflow:hidden;
+}
+#splash-progress{
+  height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  border-radius:2px;transition:width 0.4s ease;
+}
+#loading-status{font-size:12px;color:var(--text2);}
+.splash-footer{
+  position:absolute;bottom:max(24px,env(safe-area-inset-bottom));
+  font-size:11px;color:rgba(122,144,184,0.4);letter-spacing:1px;
+}
 .spin{width:32px;height:32px;border:3px solid rgba(74,158,255,0.2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
@@ -199,10 +248,25 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 <body>
 
 <div id="loading">
-  <div class="logo">📍</div>
-  <h1>Antalya Saha</h1>
-  <p id="loading-status">Harita yükleniyor...</p>
-  <div class="spin"></div>
+  <div class="splash-map-bg"></div>
+  <div class="splash-content">
+    <div class="splash-icon">
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+        <circle cx="28" cy="28" r="28" fill="rgba(74,158,255,0.15)"/>
+        <circle cx="28" cy="28" r="20" fill="rgba(74,158,255,0.2)" stroke="rgba(74,158,255,0.4)" stroke-width="1"/>
+        <circle cx="28" cy="26" r="7" fill="#4a9eff"/>
+        <path d="M28 33 L28 46" stroke="#4a9eff" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M22 36 Q28 42 34 36" stroke="#4a9eff" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="splash-title">Antalya Saha</div>
+    <div class="splash-subtitle">COP31 · Saha Navigasyon</div>
+    <div class="splash-loading">
+      <div class="splash-bar"><div id="splash-progress"></div></div>
+      <div id="loading-status">Harita yükleniyor...</div>
+    </div>
+  </div>
+  <div class="splash-footer">Field Map · lqcin</div>
 </div>
 
 <div id="map"></div>
@@ -330,18 +394,26 @@ function initMap(){
   map.on('drag',()=>{if(gpsFollow&&!fitMode){gpsFollow=false;updateGPSBadge();}});
 
   // KMZ yükle
-  setLoadingStatus('ANTALYA.kmz yükleniyor...');
+  setLoadingStatus('ANTALYA.kmz yükleniyor...', 20);
   fetch('ANTALYA.kmz')
-    .then(r=>{if(!r.ok)throw new Error();return r.arrayBuffer();})
+    .then(r=>{if(!r.ok)throw new Error();setLoadingStatus('KMZ açılıyor...', 50);return r.arrayBuffer();})
     .then(buf=>parseKMZ(buf))
     .catch(()=>{
-      setLoadingStatus('KMZ yüklenemedi');
+      setLoadingStatus('KMZ yüklenemedi ❌');
       setTimeout(()=>hideLoding(),2000);
     });
 }
 
-function setLoadingStatus(s){document.getElementById('loading-status').textContent=s;}
-function hideLoding(){document.getElementById('loading').style.display='none';}
+function setLoadingStatus(s,pct){
+  document.getElementById('loading-status').textContent=s;
+  if(pct!=null)document.getElementById('splash-progress').style.width=pct+'%';
+}
+function hideLoding(){
+  const el=document.getElementById('loading');
+  el.style.transition='opacity 0.5s ease';
+  el.style.opacity='0';
+  setTimeout(()=>el.style.display='none',500);
+}
 
 // ── KMZ / KML Parse ───────────────────────────────────────
 function parseKMZ(buf){
@@ -428,7 +500,7 @@ function parseKML(text){
     map.fitBounds(b,{padding:[40,40],maxZoom:19});
   }
 
-  setLoadingStatus(`${count} obje yüklendi`);
+  setLoadingStatus(`${count} obje yüklendi`, 100);
   setTimeout(hideLoding,600);
   startGPS();
 }
