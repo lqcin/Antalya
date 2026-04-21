@@ -178,7 +178,19 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 }
 #toast.show{opacity:1;}
 
-/* Leaflet */
+/* Harita tipi */
+#maptype-panel{display:none;}
+#maptype-panel.show{display:flex!important;}
+.mt-item{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:10px 14px;border-radius:10px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface2);
+  transition:all 0.15s;min-width:64px;
+}
+.mt-item:active{transform:scale(0.93);}
+.mt-item.active{border-color:var(--accent);background:rgba(74,158,255,0.15);}
+.mt-icon{font-size:22px;}
+.mt-label{font-size:10px;color:var(--text2);font-weight:600;}
 .leaflet-popup-content-wrapper{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:10px!important;}
 .leaflet-popup-tip{background:var(--surface)!important;}
 .leaflet-marker-icon,.leaflet-marker-shadow{background:none!important;border:none!important;}
@@ -250,6 +262,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
   <div class="tbtn" id="btn-fit" onclick="toggleFit()">
     <span class="icon">⊡</span>Sığdır
   </div>
+  <div class="tbtn" id="btn-maptype" onclick="toggleMapPanel()">
+    <span class="icon">🛰</span>Altlık
+  </div>
   <div class="tbtn" id="btn-meas" onclick="toggleMeasure()">
     <span class="icon">📏</span>Ölç
   </div>
@@ -259,6 +274,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 </div>
 
 <div id="toast"></div>
+
+<!-- Harita tipi paneli -->
+<div id="maptype-panel" style="position:absolute;bottom:90px;left:50%;transform:translateX(-50%);z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;display:none;gap:8px;flex-wrap:nowrap;">
+  <div class="mt-item active" id="mt-osm" onclick="setMapType('osm')">
+    <div class="mt-icon">🗺</div><div class="mt-label">Standart</div>
+  </div>
+  <div class="mt-item" id="mt-sat" onclick="setMapType('sat')">
+    <div class="mt-icon">🛰</div><div class="mt-label">Uydu</div>
+  </div>
+  <div class="mt-item" id="mt-topo" onclick="setMapType('topo')">
+    <div class="mt-icon">⛰</div><div class="mt-label">Topo</div>
+  </div>
+  <div class="mt-item" id="mt-dark" onclick="setMapType('dark')">
+    <div class="mt-icon">🌑</div><div class="mt-label">Karanlık</div>
+  </div>
+</div>
 
 <script>
 // ── Global değişkenler ────────────────────────────────────
@@ -273,7 +304,8 @@ let measMode='line', measActive=false;
 let measPts=[], measMarkers=[], measLine=null, measPoly=null;
 let navTarget=null, navActive=false;
 let currentObjTarget=null;
-let fitMode=false; // false=GPS, true=proje
+let fitMode=false;
+let baseLayers={}, currentBase='osm';
 
 // ── Harita başlat ─────────────────────────────────────────
 function initMap(){
@@ -283,7 +315,13 @@ function initMap(){
     preferCanvas:true,renderer:_canvas,
     center:[36.9,30.7],zoom:13
   });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22}).addTo(map);
+
+  // Altlık katmanları
+  baseLayers.osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22});
+  baseLayers.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+  baseLayers.topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17});
+  baseLayers.dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:20});
+  baseLayers.osm.addTo(map);
 
   map.on('click',onMapClick);
   map.on('mousemove',onMouseMove);
@@ -520,6 +558,26 @@ function updateGPSBadge(){
   const badge=document.getElementById('gps-badge');
   if(gpsFollow){badge.style.borderColor='var(--accent2)';}
   else{badge.style.borderColor='';}
+}
+
+// ── Harita tipi ───────────────────────────────────────────
+function setMapType(type){
+  map.removeLayer(baseLayers[currentBase]);
+  baseLayers[type].addTo(map);
+  baseLayers[type].bringToBack();
+  currentBase=type;
+  document.querySelectorAll('.mt-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('mt-'+type).classList.add('active');
+  document.getElementById('maptype-panel').classList.remove('show');
+  document.getElementById('btn-maptype').classList.remove('active');
+}
+
+function toggleMapPanel(){
+  const panel=document.getElementById('maptype-panel');
+  const btn=document.getElementById('btn-maptype');
+  const isOpen=panel.classList.contains('show');
+  panel.classList.toggle('show',!isOpen);
+  btn.classList.toggle('active',!isOpen);
 }
 
 // ── Sığdır Toggle ─────────────────────────────────────────
