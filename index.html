@@ -334,7 +334,9 @@ function parseKML(text){
     const name=pm.querySelector('name')?.textContent?.trim()||'';
     const desc=pm.querySelector('description')?.textContent?.trim()||'';
     const styleUrl=pm.querySelector('styleUrl')?.textContent||'';
-    const color=getKMLColor(pm,doc)||'#4a9eff';
+    const styleObj=getKMLColor(pm,doc);
+    const color=styleObj?.color || '#4a9eff';
+    const opacity=styleObj?.opacity ?? 1;
 
     // Point
     const ptEl=pm.querySelector('Point coordinates');
@@ -357,7 +359,13 @@ function parseKML(text){
     if(lnEl){
       const pts=kmlCoords(lnEl.textContent);
       if(pts.length>=2){
-        const pl=L.polyline(pts,{color,weight:2.5,renderer:_canvas}).addTo(lg);
+        const pg=L.polygon(pts,{
+           color,
+           opacity,
+           weight:2,
+           fillOpacity:opacity*0.3,
+           renderer:_canvas
+          }).addTo(lg);
         const center=pts[Math.floor(pts.length/2)];
         pl.on('click',e=>{L.DomEvent.stopPropagation(e);const d=calcPolyLen(pts);showObjPopup({name:name||'Çizgi',type:'line',pts,center,info:`Uzunluk: ${fmtDist(d)}`});});
         kmlObjects.push({name,type:'line',pts,center});
