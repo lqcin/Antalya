@@ -484,18 +484,11 @@ function parseKML(text){
     paint:{'circle-radius':6,'circle-color':['get','color'],'circle-stroke-width':2,'circle-stroke-color':'#fff'}
   });
 
-  // Tıklama
-  LAYERS.forEach(lid=>{
-    map.on('click',lid,e=>{
-      const f=e.features?.[0];if(!f)return;
-      e.preventDefault?.();
-      const p=f.properties;
-      const obj=kmlObjects.find(o=>o.name===p.name&&o.type===p.objType);
-      if(obj)showPopup(obj,e.lngLat);
-    });
-    map.on('mouseenter',lid,()=>map.getCanvas().style.cursor='pointer');
-    map.on('mouseleave',lid,()=>map.getCanvas().style.cursor='');
-  });
+  // GeoJSON cache'e kaydet
+  _geojsonCache={type:'FeatureCollection',features};
+
+  // Tıklama handler'ları
+  addClickHandlers();
 
   // Bounds
   if(bounds.length){
@@ -643,43 +636,59 @@ function toggleFit(){
 // ═══════════════════════════════════════════════════════
 // ALLIK SEÇİCİ
 // ═══════════════════════════════════════════════════════
-function setBase(type){
-  map.setStyle(BASE_STYLES[type]);
-  map.once('styledata',()=>{
-    // KML katmanlarını yeniden ekle
-    if(map.getSource(SRC))return;
-    const src=map.getSource(SRC);
-    if(!src)reAddKMLLayers();
-  });
-  currentBase=type;
-  document.querySelectorAll('.mt-card').forEach(el=>el.classList.remove('on'));
-  document.getElementById('mc-'+type).classList.add('on');
-  document.getElementById('mt-panel').classList.remove('show');
-  document.getElementById('btn-mt').classList.remove('on');
-}
-
 // Stil değişince kaynak/katmanlar kaybolur — yeniden ekle
-function reAddKMLLayers(){
-  if(!kmlObjects.length)return;
+let _geojsonCache=null; // GeoJSON'u sakla
+
+function buildGeoJSON(){
   const features=[];
   kmlObjects.forEach(o=>{
     if(o.type==='point')features.push({type:'Feature',geometry:{type:'Point',coordinates:[o.center[1],o.center[0]]},properties:{name:o.name,color:o.color,objType:'point'}});
     else if(o.type==='line')features.push({type:'Feature',geometry:{type:'LineString',coordinates:o.pts.map(p=>[p[1],p[0]])},properties:{name:o.name,color:o.color,objType:'line'}});
     else if(o.type==='poly')features.push({type:'Feature',geometry:{type:'Polygon',coordinates:[o.pts.map(p=>[p[1],p[0]])]},properties:{name:o.name,color:o.color,objType:'poly'}});
   });
-  map.addSource(SRC,{type:'geojson',data:{type:'FeatureCollection',features},tolerance:0.5});
-  map.addLayer({id:'kml-poly-fill',type:'fill',source:SRC,filter:['==',['get','objType'],'poly'],paint:{'fill-color':['get','color'],'fill-opacity':0.14}});
-  map.addLayer({id:'kml-poly-stroke',type:'line',source:SRC,filter:['==',['get','objType'],'poly'],paint:{'line-color':['get','color'],'line-width':2.2}});
-  map.addLayer({id:'kml-line',type:'line',source:SRC,filter:['==',['get','objType'],'line'],paint:{'line-color':['get','color'],'line-width':2.2}});
-  map.addLayer({id:'kml-point',type:'circle',source:SRC,filter:['==',['get','objType'],'point'],paint:{'circle-radius':6,'circle-color':['get','color'],'circle-stroke-width':2,'circle-stroke-color':'#fff'}});
+  return{type:'FeatureCollection',features};
+}
+
+function addClickHandlers(){
   LAYERS.forEach(lid=>{
-    map.on('click',lid,e=>{const f=e.features?.[0];if(!f)return;const obj=kmlObjects.find(o=>o.name===f.properties.name&&o.type===f.properties.objType);if(obj)showPopup(obj,e.lngLat);});
+    map.on('click',lid,e=>{
+      e.preventDefault?.();
+      const f=e.features?.[0];if(!f)return;
+      const obj=kmlObjects.find(o=>o.name===f.properties.name&&o.type===f.properties.objType);
+      if(obj)showPopup(obj,e.lngLat);
+    });
     map.on('mouseenter',lid,()=>map.getCanvas().style.cursor='pointer');
     map.on('mouseleave',lid,()=>map.getCanvas().style.cursor='');
   });
 }
 
-map?.on('styledata',()=>{if(!map.getSource(SRC)&&kmlObjects.length)reAddKMLLayers();});
+function reAddKMLLayers(){
+  if(!kmlObjects.length)return;
+  try{
+    if(map.getSource(SRC)){
+      map.getSource(SRC).setData(_geojsonCache||buildGeoJSON());
+      addClickHandlers();
+      return;
+    }
+    if(!_geojsonCache)_geojsonCache=buildGeoJSON();
+    map.addSource(SRC,{type:'geojson',data:_geojsonCache,tolerance:0.5});
+    map.addLayer({id:'kml-poly-fill',type:'fill',source:SRC,filter:['==',['get','objType'],'poly'],paint:{'fill-color':['get','color'],'fill-opacity':0.14}});
+    map.addLayer({id:'kml-poly-stroke',type:'line',source:SRC,filter:['==',['get','objType'],'poly'],paint:{'line-color':['get','color'],'line-width':2.2}});
+    map.addLayer({id:'kml-line',type:'line',source:SRC,filter:['==',['get','objType'],'line'],paint:{'line-color':['get','color'],'line-width':2.2}});
+    map.addLayer({id:'kml-point',type:'circle',source:SRC,filter:['==',['get','objType'],'point'],paint:{'circle-radius':6,'circle-color':['get','color'],'circle-stroke-width':2,'circle-stroke-color':'#fff'}});
+    addClickHandlers();
+  }catch(e){console.warn('reAddKMLLayers:',e);}
+}
+
+function setBase(type){
+  currentBase=type;
+  map.setStyle(BASE_STYLES[type]);
+  map.once('idle',()=>reAddKMLLayers());
+  document.querySelectorAll('.mt-card').forEach(el=>el.classList.remove('on'));
+  document.getElementById('mc-'+type).classList.add('on');
+  document.getElementById('mt-panel').classList.remove('show');
+  document.getElementById('btn-mt').classList.remove('on');
+}
 
 function toggleMT(){
   const panel=document.getElementById('mt-panel');
